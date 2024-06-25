@@ -1,5 +1,6 @@
-import React, { useReducer } from 'react';
+import React, { useEffect, useReducer } from 'react';
 import SuggestionList from "./suggestionList";
+import useDebounce from './hooks/useDebounce'
 
 const intialState = {
     inputVal: "",
@@ -35,23 +36,29 @@ function AutoSuggest(
     }
 ) {
     const [state, dispatch] = useReducer(reducer, intialState)
+    const debounceValue = useDebounce(state.inputVal, 300);
 
-    const onInputChange = async (value) => {
+    const onInputChange = (value) => {
         dispatch({
             type: 'input',
             value: value
         });
         onChange(value);
-        if (value.length > 0) {
-            const result = await getSuggestions();
-            dispatch({ type: "suggestions", value: result });
-
-        } else {
-            dispatch({ type: "suggestions", value: [] });
-        }
     }
 
-    const getSuggestions = async () => {
+    useEffect(() => {
+        (async () => {
+            if (debounceValue.length > 0) {
+                const result = await getSuggestions(debounceValue);
+                dispatch({ type: "suggestions", value: result });
+
+            } else {
+                dispatch({ type: "suggestions", value: [] });
+            }
+        })()
+    }, [debounceValue])
+
+    const getSuggestions = async (value) => {
         if (staticSuggestions) {
             const filteredSuggestions = staticSuggestions.filter(suggestion => suggestion.toLowerCase().includes(state.inputVal));
             return filteredSuggestions;
@@ -61,7 +68,7 @@ function AutoSuggest(
                     type: 'loading',
                     value: true
                 });
-                const result = await fetchSuggestion(state.inputVal);
+                const result = await fetchSuggestion(value);
                 return result;
             } catch (err) {
                 dispatch({
